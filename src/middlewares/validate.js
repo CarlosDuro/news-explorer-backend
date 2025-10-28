@@ -14,3 +14,15 @@ export const validateSignin = celebrate({
     password: Joi.string().required(),
   }),
 });
+
+export const validateArticle = celebrate({
+  [Segments.BODY]: Joi.object({
+    keyword: Joi.string().required(),
+    title: Joi.string().required(),
+    text: Joi.string().required(),
+    date: Joi.string().required(),
+    source: Joi.string().required(),
+    link: Joi.string().uri().required(),
+    image: Joi.string().uri().required(),
+  }),
+});
