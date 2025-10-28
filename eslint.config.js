@@ -16,7 +16,6 @@ export default [
     rules: {
       'prettier/prettier': 'warn',
       'no-underscore-dangle': ['error', { allow: ['_id'] }],
-      // ⬇️ clave: ignorar parámetros no usados que comiencen con "_"
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },

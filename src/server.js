@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 import { errors as celebrateErrors } from 'celebrate';
 import { PORT, MONGODB_URI, CORS_ORIGIN, NODE_ENV } from './config/index.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import authRoutes from './routes/auth.js';
 
 const app = express();
 
@@ -19,7 +20,7 @@ app.use(express.json());
 app.use(
   cors({
     origin(origin, cb) {
-      if (!origin) return cb(null, true);
+      if (!origin) return cb(null, true); // Postman/cURL
       if (CORS_ORIGIN.length === 0 || CORS_ORIGIN.includes(origin)) return cb(null, true);
       return cb(new Error('Not allowed by CORS'));
     },
@@ -32,6 +33,9 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 /* Health */
 app.get('/healthz', (_, res) => res.json({ ok: true }));
+
+/* Rutas */
+app.use('/auth', authRoutes);
 
 /* Celebrate validation errors */
 app.use(celebrateErrors());
