@@ -1,41 +1,28 @@
 # News Explorer – Backend
 
-Inicialización del repositorio backend.
+API en Node/Express + MongoDB para autenticación y gestión de artículos guardados.
 
----
+## Configuración
 
-## 🤝 Contribución / Estándares
+Coloca las variables en un archivo .env (ver .env.example):
 
-### ✅ Definition of Done (DoD)
+- PORT (por defecto 8080)
+- MONGODB_URI (cadena de conexión Mongo)
+- JWT_SECRET (firma de tokens)
+- CORS_ORIGIN (lista separada por comas; por ejemplo, URL del frontend en Render y localhost)
+- NODE_ENV (development o production)
 
-Una tarea o Pull Request se considera **completada** solo si cumple:
+## Scripts
 
-- [ ] Código limpio y legible
-- [ ] ESLint y Prettier ejecutados sin errores (`npm run lint`, `npm run format`)
-- [ ] Sin warnings críticos en consola
-- [ ] Funciona correctamente en local (probado con endpoints)
-- [ ] Commits siguen **Conventional Commits**
-- [ ] Revisión aprobada (>=1) antes de mergear
-- [ ] Logs/archivos temporales removidos
+- npm run dev (modo desarrollo con watch)
+- npm start (modo producción)
 
-### 📝 Convención de Commits (Conventional Commits)
+## Endpoints
 
-Formato:
-
-tipo(scope): descripción corta
-
-Tipos: `feat`, `fix`, `docs`, `style`, `refactor`, `chore`, `test`
-
-Ejemplos:
-feat(users): add /signup and /signin
-fix(articles): correct owner check in DELETE
-docs: add DoD and commit rules
-chore(devops): update env examples
-
-### ✅ Checklist para cada Pull Request
-
-- [ ] Código probado en local (endpoints principales)
-- [ ] ESLint y Prettier ejecutados
-- [ ] Mensajes de commit correctos
-- [ ] Documentación/README actualizados (si aplica)
-- [ ] PR listo para revisión 🚀
+- GET /healthz (salud)
+- POST /auth/signup (registro)
+- POST /auth/signin (login)
+- GET /auth/me (perfil; requiere Authorization: Bearer token)
+- GET /articles (listar; auth)
+- POST /articles (crear; auth)
+- DELETE /articles/:id (eliminar; auth)
