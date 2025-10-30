@@ -26,6 +26,10 @@ app.use(helmet());
 app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json());
 
+/* Public search endpoint */
+import searchRoutes from './routes/search.js';
+app.use('/search', searchRoutes);
+
 app.use(
   cors({
     origin: function (origin, cb) {
