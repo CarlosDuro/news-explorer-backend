@@ -1,49 +1,32 @@
-const NEWS_API_URL = 'https://newsapi.org/v2/everything';
-
-function mapArticle(a) {
-  return {
-    title: a.title || 'Untitled',
-    text: a.description || '',
-    date: (a.publishedAt || '').slice(0, 10),
-    source: a.source?.name || 'Web',
-    link: a.url || '#',
-    image: a.urlToImage || 'https://picsum.photos/600/400',
-  };
-}
-
 export async function searchNews(req, res, next) {
   try {
-    const q = (req.query.q || '').trim();
-    if (!q) return res.status(400).json({ message: 'Missing query param q' });
+    const q = (req.query.q || '').trim() || 'news';
 
-    const key = process.env.NEWS_API_KEY || '';
-    if (!key) {
-      // Fallback demo (sin API key)
-      const now = new Date().toISOString().slice(0, 10);
-      const demo = Array.from({ length: 6 }).map((_, i) => ({
-        title: `${q}: headline #${i + 1}`,
-        text: 'Demo article...',
-        date: now,
-        source: 'Demo',
-        link: 'https://example.com',
-        image: 'https://picsum.photos/600/400',
-      }));
-      return res.json({ query: q, total: demo.length, items: demo });
-    }
+    // mock estable (como el que te devolvió Render)
+    const items = [
+      {
+        title: 'El nuevo AI Mode de Google estrena una función que hará temblar a ChatGPT',
+        text: 'Google ha lanzado una actualización para su buscador...',
+        date: '2025-09-30',
+        source: 'Hipertextual',
+        link: 'https://hipertextual.com/inteligencia-artificial/ai-mode-busqueda-visual-imagenes/',
+        image: 'https://i0.wp.com/imgs.hipertextual.com/wp-content/uploads/2025/09/google-ai-mode-imagenes.jpg?fit=1600%2C901&quality=70&strip=all&ssl=1'
+      },
+      {
+        title: 'Nueva ayuda para estudiantes: Google te regala 12 meses de su IA más TOP',
+        text: 'Ser estudiante ya no solo es interesante para contratar...',
+        date: '2025-10-13',
+        source: 'Hipertextual',
+        link: 'https://hipertextual.com/tecnologia/nueva-ayuda-para-estudiantes-google-te-regala-12-meses-de-su-ia-mas-top-y-2-tb-de-memoria-en-la-nube/',
+        image: 'https://imgs.hipertextual.com/wp-content/uploads/2025/10/google-ai-pro-.jpg'
+      }
+    ];
 
-    const url = new URL(NEWS_API_URL);
-    url.searchParams.set('q', q);
-    url.searchParams.set('language', process.env.NEWS_API_LANG || 'es');
-    url.searchParams.set('pageSize', '10');
-    url.searchParams.set('sortBy', 'publishedAt');
-    url.searchParams.set('apiKey', key);
-
-    const r = await fetch(url, { headers: { Accept: 'application/json' } });
-    const data = await r.json();
-    if (!r.ok) return res.status(r.status).json({ message: data?.message || 'News API error' });
-
-    const items = (data.articles || []).map(mapArticle);
-    res.json({ query: q, total: items.length, items });
+    res.json({
+      query: q,
+      total: items.length,
+      items,
+    });
   } catch (e) {
     next(e);
   }
