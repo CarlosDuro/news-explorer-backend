@@ -2,6 +2,7 @@ import express from 'express';
 
 const router = express.Router();
 
+// mock de búsqueda para el frontend
 router.get('/search', (req, res) => {
   const q = (req.query.q || '').toString();
   res.json({
