@@ -6,81 +6,96 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { errors as celebrateErrors } from 'celebrate';
 
+// importa tu config real
 import { PORT, MONGODB_URI, CORS_ORIGIN, NODE_ENV } from './config/index.js';
-import authRoutes from './routes/auth.js';
-import articlesRoutes from './routes/articles.js';
-import searchRoutes from './routes/search.js';
-import { auth } from './middlewares/auth.js';
+// importa tus rutas reales (las que ya tenías para /auth, /users, /articles, etc.)
+import routes from './routes/index.js';
+// tu manejador de errores personalizado
 import { errorHandler } from './middlewares/errorHandler.js';
 
 const app = express();
 app.set('trust proxy', 1);
 
+/**
+ * PRE-OPTIONS universal
+ * Esto responde primero a las preflight OPTIONS de navegadores
+ * sin llegar a las rutas de express, y usando tu lista de orígenes.
+ */
+app.use((req, res, next) => {
+  if (req.method !== 'OPTIONS') return next();
+
+  const origin = req.headers.origin;
+  const allowList = Array.isArray(CORS_ORIGIN) ? CORS_ORIGIN : [];
+
+  const allowed =
+    !origin || allowList.length === 0 || allowList.includes(origin);
+
+  if (!allowed) return res.sendStatus(403);
+
+  res.setHeader('Vary', 'Origin');
+  if (origin) res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+  );
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type,Authorization',
+  );
+  return res.sendStatus(204);
+});
+
 // seguridad básica
-app.use(helmet());
+app.use(
+  helmet({
+    // si luego necesitas imágenes externas, aquí se ajusta
+  }),
+);
+
+// logs
 app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// body
 app.use(express.json());
 
-// CORS según tu env de Render
+// CORS real para peticiones que no son preflight
 const corsOpts = {
   origin(origin, cb) {
-    // permitir localhost / sin origin
+    // sin Origin (curl, postman) -> ok
     if (!origin) return cb(null, true);
-    const list = Array.isArray(CORS_ORIGIN) ? CORS_ORIGIN : [];
-    if (list.length === 0 || list.includes(origin)) return cb(null, true);
+    // lista vacía => permitir todo
+    if (CORS_ORIGIN.length === 0) return cb(null, true);
+    // lista con tu frontend
+    if (CORS_ORIGIN.includes(origin)) return cb(null, true);
     return cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
 };
 app.use(cors(corsOpts));
 
-// limitar (pero no OPTIONS ni /healthz)
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    skip: (req) => req.method === 'OPTIONS' || req.path === '/healthz',
-  })
-);
+// rate-limit (pero no castigues OPTIONS ni /healthz)
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) =>
+    req.method === 'OPTIONS' || req.path === '/healthz',
+});
+app.use(limiter);
 
-// health
-app.get('/healthz', (req, res) => res.json({ ok: true }));
+// ---------- RUTAS SIMPLES PROPIAS ANTES DEL RESTO ----------
 
-// públicas
-app.use('/auth', authRoutes);
-app.use('/search', searchRoutes);
-
-// privadas
-app.use('/articles', auth, articlesRoutes);
-
-// celebrate
-app.use(celebrateErrors());
-
-// 404 explícito (esto es lo que te está contestando ahora mismo)
-app.use((req, res) => {
-  res.status(404).json({ message: 'Not found' });
+// healthz para Render
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true });
 });
 
-// errores
-app.use(errorHandler);
-
-async function start() {
-  try {
-    await mongoose.connect(MONGODB_URI);
-    console.log('✅ Mongo connected');
-  } catch (err) {
-    console.error('❌ Mongo connection failed', err.message);
-  }
-
-  app.listen(PORT, () => {
-    console.log(`🚀 API on :${PORT}`);
-    console.log('🔧 CORS_ORIGIN =', CORS_ORIGIN);
-  });
-}
-
-start();
-
-// --- mock /search for frontend ---
+// MOCK DE /search para tu frontend
 app.get('/search', (req, res) => {
   const q = (req.query.q || '').toString();
 
@@ -91,7 +106,7 @@ app.get('/search', (req, res) => {
       date: '2025-10-29',
       source: 'Demo source',
       link: 'https://example.com/gemini',
-      image: 'https://picsum.photos/400'
+      image: 'https://picsum.photos/400',
     },
     {
       title: 'IA en móviles',
@@ -99,14 +114,42 @@ app.get('/search', (req, res) => {
       date: '2025-10-28',
       source: 'Demo source',
       link: 'https://example.com/moviles-ia',
-      image: 'https://picsum.photos/401'
-    }
+      image: 'https://picsum.photos/401',
+    },
   ];
 
   res.json({
     query: q,
     total: items.length,
-    items
+    items,
   });
 });
-// --- end mock /search ---
+
+// ---------- AQUÍ montas tus rutas reales ----------
+app.use('/', routes);
+
+// errores de celebrate
+app.use(celebrateErrors());
+
+// tu error handler
+app.use(errorHandler);
+
+// ---------- ARRANQUE DE SERVIDOR / DB ----------
+mongoose
+  .connect(MONGODB_URI)
+  .then(() => {
+    // eslint-disable-next-line no-console
+    console.log('✅ Mongo connected');
+
+    app.listen(PORT, () => {
+      // eslint-disable-next-line no-console
+      console.log(`✅ Server running on port ${PORT}`);
+      // eslint-disable-next-line no-console
+      console.log('🔧 CORS_ORIGIN =', CORS_ORIGIN);
+    });
+  })
+  .catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('❌ Mongo connect error', err);
+    process.exit(1);
+  });
