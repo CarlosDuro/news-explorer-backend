@@ -6,27 +6,28 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { errors as celebrateErrors } from 'celebrate';
 
-// importa tu config real
 import { PORT, MONGODB_URI, CORS_ORIGIN, NODE_ENV } from './config/index.js';
-// importa tus rutas reales (las que ya tenías para /auth, /users, /articles, etc.)
 import routes from './routes/index.js';
-// tu manejador de errores personalizado
 import { errorHandler } from './middlewares/errorHandler.js';
+
+/* imports para montar /articles directo aquí */
+import { auth } from './middlewares/auth.js';
+import { validateArticle } from './middlewares/validate.js';
+import {
+  listArticles,
+  createArticle,
+  deleteArticle,
+} from './controllers/articleController.js';
 
 const app = express();
 app.set('trust proxy', 1);
 
-/**
- * PRE-OPTIONS universal
- * Esto responde primero a las preflight OPTIONS de navegadores
- * sin llegar a las rutas de express, y usando tu lista de orígenes.
- */
+/* ---------- PRE-OPTIONS UNIVERSAL ---------- */
 app.use((req, res, next) => {
   if (req.method !== 'OPTIONS') return next();
 
   const origin = req.headers.origin;
   const allowList = Array.isArray(CORS_ORIGIN) ? CORS_ORIGIN : [];
-
   const allowed =
     !origin || allowList.length === 0 || allowList.includes(origin);
 
@@ -45,29 +46,24 @@ app.use((req, res, next) => {
   );
   return res.sendStatus(204);
 });
+/* ------------------------------------------- */
 
-// seguridad básica
-app.use(
-  helmet({
-    // si luego necesitas imágenes externas, aquí se ajusta
-  }),
-);
+/* seguridad */
+app.use(helmet());
 
-// logs
+/* logs */
 app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// body
+/* body */
 app.use(express.json());
 
-// CORS real para peticiones que no son preflight
+/* CORS normal */
 const corsOpts = {
   origin(origin, cb) {
-    // sin Origin (curl, postman) -> ok
     if (!origin) return cb(null, true);
-    // lista vacía => permitir todo
-    if (CORS_ORIGIN.length === 0) return cb(null, true);
-    // lista con tu frontend
-    if (CORS_ORIGIN.includes(origin)) return cb(null, true);
+    if (CORS_ORIGIN.length === 0 || CORS_ORIGIN.includes(origin)) {
+      return cb(null, true);
+    }
     return cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -77,25 +73,22 @@ const corsOpts = {
 };
 app.use(cors(corsOpts));
 
-// rate-limit (pero no castigues OPTIONS ni /healthz)
+/* rate limit */
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) =>
-    req.method === 'OPTIONS' || req.path === '/healthz',
+  skip: (req) => req.method === 'OPTIONS' || req.path === '/healthz',
 });
 app.use(limiter);
 
-// ---------- RUTAS SIMPLES PROPIAS ANTES DEL RESTO ----------
-
-// healthz para Render
+/* ---------- RUTAS BÁSICAS ---------- */
 app.get('/healthz', (req, res) => {
   res.json({ ok: true });
 });
 
-// MOCK DE /search para tu frontend
+/* MOCK de búsqueda (el que ve tu frontend) */
 app.get('/search', (req, res) => {
   const q = (req.query.q || '').toString();
 
@@ -125,31 +118,32 @@ app.get('/search', (req, res) => {
   });
 });
 
-// ---------- AQUÍ montas tus rutas reales ----------
+/* ---------- RUTAS DE ARTÍCULOS DIRECTO AQUÍ ---------- */
+/* así nos saltamos cualquier problema con src/routes/index.js en Render */
+app.get('/articles', auth, listArticles);
+app.post('/articles', auth, validateArticle, createArticle);
+app.delete('/articles/:id', auth, deleteArticle);
+
+/* ---------- RUTAS DEL PROYECTO (auth, etc.) ---------- */
 app.use('/', routes);
 
-// errores de celebrate
+/* errores de celebrate */
 app.use(celebrateErrors());
 
-// tu error handler
+/* manejador general */
 app.use(errorHandler);
 
-// ---------- ARRANQUE DE SERVIDOR / DB ----------
+/* ---------- ARRANQUE ---------- */
 mongoose
   .connect(MONGODB_URI)
   .then(() => {
-    // eslint-disable-next-line no-console
     console.log('✅ Mongo connected');
-
     app.listen(PORT, () => {
-      // eslint-disable-next-line no-console
       console.log(`✅ Server running on port ${PORT}`);
-      // eslint-disable-next-line no-console
       console.log('🔧 CORS_ORIGIN =', CORS_ORIGIN);
     });
   })
   .catch((err) => {
-    // eslint-disable-next-line no-console
     console.error('❌ Mongo connect error', err);
     process.exit(1);
   });
